@@ -10,11 +10,12 @@ class LamodaMain:
     LAMODA_SHOP_ID = 1
 
     @classmethod
-    def add_new_goods(cls, sub_category_id, option):
+    def add_new_goods(cls, sub_category_id, option) -> Good:
         """
         Поиск новых товаров на сайте и добавление в базу
+        :param option: опциональный параметр
         :param sub_category_id: ID подкатегории
-        :return:
+        :return: объект первого добавленного товара.
         """
         new_search = 0
         try:
