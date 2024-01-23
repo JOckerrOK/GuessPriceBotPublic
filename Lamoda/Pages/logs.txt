@@ -1,0 +1,20 @@
+2024-01-17 12:45:45,977 DEBUG    [connectionpool.py:1052] Starting new HTTPS connection (1): www.lamoda.ru:443
+2024-01-17 12:45:46,385 DEBUG    [connectionpool.py:546] https://www.lamoda.ru:443 "GET /p/mp002xm0vhli/shoes-salamander-sapogi/ HTTP/1.1" 200 None
+2024-01-17 12:48:52,869 DEBUG    [connectionpool.py:1052] Starting new HTTPS connection (1): www.lamoda.ru:443
+2024-01-17 12:48:53,280 DEBUG    [connectionpool.py:546] https://www.lamoda.ru:443 "GET /p/mp002xm0vhli/shoes-salamander-sapogi/ HTTP/1.1" 200 None
+2024-01-17 12:48:53,282 INFO     [lamoda_good_page.py:16] Load:https://www.lamoda.ru/p/mp002xm0vhli/shoes-salamander-sapogi/, status_code = 200
+2024-01-17 12:52:25,664 DEBUG    [connectionpool.py:1052] Starting new HTTPS connection (1): www.lamoda.ru:443
+2024-01-17 12:52:26,041 DEBUG    [connectionpool.py:546] https://www.lamoda.ru:443 "GET /p/mp002xm0vhli/shoes-salamander-sapogi/ HTTP/1.1" 200 None
+2024-01-17 12:52:26,042 INFO     [lamoda_good_page.py:17] Load:https://www.lamoda.ru/p/mp002xm0vhli/shoes-salamander-sapogi/, status_code = 200
+2024-01-21 11:40:43,783 DEBUG    [connectionpool.py:1052] Starting new HTTPS connection (1): www.lamoda.ru:443
+2024-01-21 11:40:44,222 DEBUG    [connectionpool.py:546] https://www.lamoda.ru:443 "GET /p/mp002xm0vhli/shoes-salamander-sapogi/ HTTP/1.1" 200 None
+2024-01-21 11:40:44,224 INFO     [lamoda_good_page.py:24] Load:https://www.lamoda.ru/p/mp002xm0vhli/shoes-salamander-sapogi/, status_code = 200
+2024-01-21 11:42:00,803 DEBUG    [connectionpool.py:1052] Starting new HTTPS connection (1): www.lamoda.ru:443
+2024-01-21 11:42:01,183 DEBUG    [connectionpool.py:546] https://www.lamoda.ru:443 "GET /p/mp002xm0vhli/shoes-salamander-sapogi/ HTTP/1.1" 200 None
+2024-01-21 11:42:01,186 INFO     [lamoda_good_page.py:24] Load:https://www.lamoda.ru/p/mp002xm0vhli/shoes-salamander-sapogi/, status_code = 200
+2024-01-21 11:42:26,210 DEBUG    [connectionpool.py:1052] Starting new HTTPS connection (1): www.lamoda.ru:443
+2024-01-21 11:42:26,636 DEBUG    [connectionpool.py:546] https://www.lamoda.ru:443 "GET /p/mp002xm0vhli/shoes-salamander-sapogi/ HTTP/1.1" 200 None
+2024-01-21 11:42:26,639 INFO     [lamoda_good_page.py:24] Load:https://www.lamoda.ru/p/mp002xm0vhli/shoes-salamander-sapogi/, status_code = 200
+2024-01-21 11:52:14,861 DEBUG    [connectionpool.py:1052] Starting new HTTPS connection (1): www.lamoda.ru:443
+2024-01-21 11:52:15,324 DEBUG    [connectionpool.py:546] https://www.lamoda.ru:443 "GET /p/mp002xm0vhli/shoes-salamander-sapogi/ HTTP/1.1" 200 None
+2024-01-21 11:52:15,327 INFO     [lamoda_good_page.py:24] Load:https://www.lamoda.ru/p/mp002xm0vhli/shoes-salamander-sapogi/, status_code = 200
