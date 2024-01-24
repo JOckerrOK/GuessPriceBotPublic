@@ -14,11 +14,12 @@ from config import Config
 COMMAND_SPLIT_SYMBOL = " "
 
 
-def get_keyboard_by_categories_list(categories: List[Category], command: str) -> types.InlineKeyboardMarkup:
+def get_keyboard_by_categories_list(categories: List[Category], command: str, is_back_key=1) -> types.InlineKeyboardMarkup:
     """
     Получение клавиатуры с категориями/подкатегориями/опциями (заполняется текст и команда)
     :param categories: массив категорий
     :param command: команда, которая будет использоваться для формирования результирующей строки в кнопке callback_data
+    :param is_back_key: флаг для добавления кнопки "назад"
     :return: объект готовой клавиатуры для сообщения
     """
     keyboard = types.InlineKeyboardMarkup()
@@ -26,6 +27,9 @@ def get_keyboard_by_categories_list(categories: List[Category], command: str) ->
         key = types.InlineKeyboardButton(text=category.text_value,
                                          callback_data=command + COMMAND_SPLIT_SYMBOL + str(category.id))
         keyboard.add(key)  # добавляем кнопку в клавиатуру
+    if is_back_key:
+        back_key = types.InlineKeyboardButton(text="Назад", callback_data=command + COMMAND_SPLIT_SYMBOL + "back")
+        keyboard.add(back_key)
     return keyboard
 
 
@@ -73,6 +77,31 @@ class TelegramBot:
         self.bot = telebot.TeleBot(Config.tg_token)
         self.logger = logging.getLogger(__name__)
 
+        @self.bot.message_handler(commands=['category'])
+        def choose_category(message, this_user=None, replace=0) -> None:
+            """
+            обработка команды выбора категории. Будет предложен выбор основных категорий
+            :param message: сообщение
+            :param this_user: объект User текущего пользователя телеграмм
+            :param replace: опция если 1 - заменяем клавиатуру в сообщении. Если 0 - отправляем новое
+            :return: None
+            """
+            if not this_user:
+                this_user = User(telegram_id=message.from_user.id)
+            keyboard = get_keyboard_by_categories_list(CategoriesPool.get_main_categories(), "cat", 0)  # через бд
+            if replace:
+                self.bot.edit_message_reply_markup(
+                    chat_id=message.chat.id,
+                    message_id=message.message_id,
+                    reply_markup=keyboard
+                )
+                this_user.set_last_message_id_with_buttons(message.id)
+            else:
+                new_message = self.bot.send_message(message.from_user.id, "Выбери категорию", reply_markup=keyboard)
+                this_user.set_last_message_id_with_buttons(new_message.message_id)
+            this_user.set_state(UserStates.CHOOSE_CAT)
+            this_user.update_user_in_db()
+
         @self.bot.message_handler(commands=['start'])
         def get_started(message) -> None:
             """
@@ -80,14 +109,21 @@ class TelegramBot:
             :param message: сообщение
             :return: None
             """
-            self.bot.send_message(message.from_user.id, "Привет, угадаешь ценник вещи?")
             this_user = User(telegram_id=message.from_user.id)
+            if not this_user.last_message_id_with_buttons:
+                self.bot.send_message(message.from_user.id, "Привет, угадаешь ценник вещи?")
             if this_user.state == UserStates.CHOOSE_CAT:
                 choose_category(message, this_user)
+            elif this_user.state == UserStates.CHOOSE_OPTION:
+                self.bot.send_message(message.chat.id, "Выбери тут", reply_to_message_id=this_user.last_message_id_with_buttons)
             elif this_user.state == UserStates.CHOOSE_SUBCAT:
-                self.bot.send_message(message.from_user.id, "Ты еще не выбрал подкатегорию, жду!")
+                self.bot.send_message(message.chat.id, "Выбери тут", reply_to_message_id=this_user.last_message_id_with_buttons)
             elif this_user.state == UserStates.WAIT_PRICE_CHOICE:
-                self.bot.send_message(message.from_user.id, "Ты еще не угадал цену!, жду!")
+                self.bot.send_message(message.chat.id, "Выбери тут", reply_to_message_id=this_user.last_message_id_with_buttons)
+            elif this_user.state == UserStates.IDLE:
+                send_idle_message(this_user.telegram_id)
+            else:
+                choose_category(message, this_user)
 
         def send_idle_message(user_id) -> None:
             """
@@ -101,22 +137,7 @@ class TelegramBot:
             next_key = types.InlineKeyboardButton(text="Дальше",
                                                   callback_data="next")
             keyboard.add(refresh_key, next_key)
-            self.bot.send_message(user_id, "Куда дальше?", reply_markup=keyboard)
-
-        @self.bot.message_handler(commands=['category'])
-        def choose_category(message, this_user=None) -> None:
-            """
-            обработка команды выбора категории. Будет предложен выбор основных категорий
-            :param message: сообщение
-            :param this_user: объект User текущего пользователя телеграмм
-            :return: None
-            """
-            keyboard = get_keyboard_by_categories_list(CategoriesPool.get_main_categories(), "cat")  # через бд
-            self.bot.send_message(message.from_user.id, "Выбери категорию", reply_markup=keyboard)
-            if not this_user:
-                this_user = User(telegram_id=message.from_user.id)
-            this_user.set_state(UserStates.CHOOSE_CAT)
-            this_user.update_user_in_db()
+            new_message = self.bot.send_message(user_id, "Куда дальше?", reply_markup=keyboard)
 
         @self.bot.callback_query_handler(func=lambda call: True)
         def key_press_manager(call: types.CallbackQuery) -> None:
@@ -136,11 +157,11 @@ class TelegramBot:
             self.logger.info("Button_command accepted from Tg " + log_string)
             print(log_string)
             if this_user.state == UserStates.CHOOSE_CAT:
-                choose_option(call, this_user=this_user)
+                category_chosen(call, this_user=this_user)
             elif this_user.state == UserStates.CHOOSE_OPTION:
-                choose_subcategory(call, this_user=this_user)
+                option_chosen(call, this_user=this_user)
             elif this_user.state == UserStates.CHOOSE_SUBCAT:
-                choose_price(call, this_user=this_user)
+                sub_category_chosen(call, this_user=this_user)
             elif this_user.state == UserStates.WAIT_PRICE_CHOICE:
                 price_selected(call, this_user=this_user)
             elif this_user.state == UserStates.IDLE:
@@ -149,9 +170,9 @@ class TelegramBot:
                 self.logger.error(f"НЕ обработанное состояние у пользователя id: {this_user.user_id}, state: {this_user.state}")
             self.bot.answer_callback_query(call.id)
 
-        def choose_option(call: types.CallbackQuery, this_user=None) -> None:
+        def category_chosen(call: types.CallbackQuery, this_user=None) -> None:
             """
-            Вызывается при выборе пользователем категории. Обновляется клавиатура для выбора опции
+            Вызывается при выборе пользователем категории. Заполняем выбранную категорию у пользователя
             :param call: значение вызова
             :param this_user: объект User текущего пользователя телеграмм
             :return: None
@@ -161,19 +182,27 @@ class TelegramBot:
                 if not this_user:
                     this_user = User(telegram_id=call.from_user.id)
                 this_user.set_category(int(command[1]))
+                this_user.set_last_message_id_with_buttons(call.message.message_id)
                 this_user.update_user_in_db()
-                options = CategoriesPool.get_options_list(int(command[1]))
-                if not options:
-                    call.data = "option" + COMMAND_SPLIT_SYMBOL + "0"
-                    choose_subcategory(call, this_user)
-                keyboard = get_keyboard_by_categories_list(options, "option")
-                print(call.message)
-                self.bot.edit_message_text("Какие товары показать?", call.message.chat.id, call.message.id)
-                self.bot.edit_message_reply_markup(
-                    chat_id=call.message.chat.id,
-                    message_id=call.message.message_id,
-                    reply_markup=keyboard
-                )
+                send_options(call.message, this_user)
+
+        def send_options(message: types.Message, this_user: User) -> None:
+            """
+            Обновляется клавиатура для выбора опции
+            :param message:
+            :param this_user:
+            :return:
+            """
+            options = CategoriesPool.get_options_list(this_user.category_id)
+            if not options:
+                send_sub_categories(message, this_user)
+            keyboard = get_keyboard_by_categories_list(options, "option")
+            self.bot.edit_message_text("Какие товары показать?", message.chat.id, message.id)
+            self.bot.edit_message_reply_markup(
+                chat_id=message.chat.id,
+                message_id=message.message_id,
+                reply_markup=keyboard
+            )
 
         def idle(call: types.CallbackQuery, this_user=None) -> None:
             """
@@ -183,14 +212,14 @@ class TelegramBot:
             :return: None
             """
             if call.data == "refresh":
+                self.bot.delete_message(chat_id=call.message.chat.id, message_id=call.message.message_id)
                 choose_category(call, this_user)
             elif call.data == "next":
-                choose_price(call, this_user)
+                sub_category_chosen(call, this_user)
 
-        # @bot.callback_query_handler(func=lambda call: user.get_state() == UserStates.CHOOSE_CAT)
-        def choose_subcategory(call: types.CallbackQuery, this_user=None) -> None:
+        def option_chosen(call: types.CallbackQuery, this_user=None) -> None:
             """
-            Вызывается при выборе пользователем опции. Обновляется клавиатура для выбора подкатегории
+            Вызывается при выборе пользователем опции.
             :param call: значение вызова
             :param this_user: объект User текущего пользователя телеграмм
             :return: None
@@ -199,15 +228,57 @@ class TelegramBot:
             if command[0] == "option":
                 if not this_user:
                     this_user = User(telegram_id=call.from_user.id)
+                if command[1] == "back":
+                    choose_category(call.message, this_user, 1)
+                    return None
                 this_user.set_option(int(command[1]))
+                this_user.set_last_message_id_with_buttons(call.message.message_id)
                 this_user.update_user_in_db()
-                sub_categories = CategoriesPool.get_sub_categories(main_category_id=this_user.category_id, option=this_user.option)
-                keyboard = get_keyboard_by_categories_list(sub_categories, "subcat")
-                self.bot.edit_message_reply_markup(
-                    chat_id=call.message.chat.id,
-                    message_id=call.message.message_id,
-                    reply_markup=keyboard
-                )
+                send_sub_categories(call.message, this_user)
+
+        def send_sub_categories(message, this_user: User) -> None:
+            """
+            Обновляется клавиатура для выбора подкатегории в сообщении
+            :param message:
+            :param this_user:
+            :return: None
+            """
+            sub_categories = CategoriesPool.get_sub_categories(main_category_id=this_user.category_id, option=this_user.option)
+            keyboard = get_keyboard_by_categories_list(sub_categories, "subcat")
+            self.bot.edit_message_reply_markup(
+                chat_id=message.chat.id,
+                message_id=message.message_id,
+                reply_markup=keyboard
+            )
+
+        def sub_category_chosen(call: types.CallbackQuery, this_user=None) -> None:
+            """
+            Вызывается при выборе пользователем подкатегории
+            :param call: значение вызова
+            :param this_user: объект User текущего пользователя телеграмм
+            :return: None
+            """
+            command = call.data.split(COMMAND_SPLIT_SYMBOL)
+            if not this_user:
+                this_user = User(telegram_id=call.from_user.id)
+            if command[0] == "subcat":
+                if command[1] == "back":
+                    this_user.set_state(UserStates.CHOOSE_OPTION)
+                    this_user.update_user_in_db()
+                    send_options(call.message, this_user)
+                    return None
+                this_user.sub_category_id = int(command[1])
+            elif call.data == "next":
+                next = 1
+            else:  # если был рандомный вызов - заглушка:
+                self.bot.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id)
+                self.bot.send_message(call.message.chat.id, "Спасибо за выбор категории, дальше будет больше!")
+                self.bot.answer_callback_query(call.id)
+                return None
+            self.bot.delete_message(chat_id=call.message.chat.id,message_id=call.message.message_id)
+            #self.bot.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id)
+            send_next_good(call.message, this_user)
+            self.bot.answer_callback_query(call.id)
 
         @self.bot.message_handler(commands=['next'])
         def send_next_good(message, this_user=None) -> None:
@@ -224,7 +295,7 @@ class TelegramBot:
                 choose_category(message, this_user)
                 return
             elif this_user.sub_category_id == -1:
-                choose_subcategory(message, this_user)
+                option_chosen(message, this_user)
                 return
             current_offset = this_user.get_offset_of_actual_sub_category()
             try:
@@ -238,34 +309,11 @@ class TelegramBot:
             this_user.set_subcategory(this_user.sub_category_id)
             this_user.update_user_in_db()
             self.bot.send_photo(message.chat.id, good.image_links[0])
-            #keyboard = set_prices_keyboard(good.get_prices())
             keyboard = get_keyboard_for_good_prices(good)
-            self.bot.send_message(message.chat.id, f"""Производитель: {good.brand}
+            new_message = self.bot.send_message(message.chat.id, f"""Производитель: {good.brand}
 Описание: {good.description}""", reply_markup=keyboard)
-
-        def choose_price(call: types.CallbackQuery, this_user=None) -> None:
-            """
-            Вызывается при выборе пользователем подкатегории
-            :param call: значение вызова
-            :param this_user: объект User текущего пользователя телеграмм
-            :return: None
-            """
-            command = call.data.split(COMMAND_SPLIT_SYMBOL)
-            if not this_user:
-                this_user = User(telegram_id=call.from_user.id)
-            if command[0] == "subcat":
-                this_user.sub_category_id = int(command[1])
-            elif call.data == "next":
-                next = 1
-            else:  # если был рандомный вызов - заглушка:
-                self.bot.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id)
-                # call.message.edit_message_reply_markup()
-                self.bot.send_message(call.message.chat.id, "Спасибо за выбор категории, дальше будет больше!")
-                self.bot.answer_callback_query(call.id)
-                return None
-            self.bot.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id)
-            send_next_good(call.message, this_user)
-            self.bot.answer_callback_query(call.id)
+            this_user.set_last_message_id_with_buttons(new_message.message_id)
+            this_user.update_user_in_db()
 
         def price_selected(call: types.CallbackQuery, this_user=None):
             """

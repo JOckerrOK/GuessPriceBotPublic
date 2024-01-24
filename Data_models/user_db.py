@@ -23,6 +23,9 @@ class User:
                  first_visit_timestamp=0,
                  last_updated_timestamp=0,
                  last_message_id_with_buttons=0,
+                 name="",
+                 last_name="",
+                 telegram_login="",
                  ):
         self.user_id = user_id  # ID пользователя - назначается автоматически в БД
         self.telegram_id = telegram_id  # telegramm ID - заполняется при первом посещении бота
@@ -35,6 +38,9 @@ class User:
         self.first_visit_timestamp = first_visit_timestamp  # временная отметка первого визита пользователя (время регистрации)
         self.last_updated_timestamp = last_updated_timestamp  # время последнего обновления состояния пользователя
         self.last_message_id_with_buttons = last_message_id_with_buttons  # ID последнего сообщения, отображенного пользователю. Пока не используется
+        self.name = name
+        self.last_name = last_name
+        self.telegram_login = telegram_login
         if telegram_id > 0 or user_id > 0:
             self.sync_db_user(telegram_id=telegram_id, user_id=user_id)
 
@@ -58,6 +64,9 @@ class User:
             last_updated_timestamp INTEGER,
             current_good_id INTEGER,
             last_message_id_with_buttons INTEGER,
+            name TEXT,
+            last_name TEXT,
+            telegram_login TEXT
             
             FOREIGN KEY (category_id) REFERENCES categories (category_id),
             FOREIGN KEY (sub_category_id) REFERENCES sub_categories (sub_category_id),
@@ -77,9 +86,13 @@ class User:
             first_visit_timestamp=0,
             last_updated_timestamp=0,
             last_message_id_with_buttons=0,
+            name="",
+            last_name="",
+            telegram_login="",
     ) -> None:
         """
         Функция заполнения переменных в объекте
+
         :param user_id: ID пользователя
         :param telegram_id: ID телеграмм аккаунта
         :param state: текущее состояние
@@ -91,6 +104,9 @@ class User:
         :param first_visit_timestamp: временная отметка первого визита пользователя (время регистрации)
         :param last_updated_timestamp: время последнего обновления состояния пользователя
         :param last_message_id_with_buttons: ID последнего сообщения, отображенного пользователю. Пока не используется
+        :param telegram_login: логин в телеграме
+        :param last_name: Фамилия в телеграме
+        :param name: имя в телеграме
         :return: None
         """
         self.user_id = user_id
@@ -104,6 +120,9 @@ class User:
         self.first_visit_timestamp = first_visit_timestamp
         self.last_updated_timestamp = last_updated_timestamp
         self.last_message_id_with_buttons = last_message_id_with_buttons
+        self.name = name
+        self.last_name = last_name
+        self.telegram_login = telegram_login
 
     def create_user_in_db(self, cursor: sqlite3.Cursor) -> None:
         """
@@ -123,9 +142,12 @@ class User:
                              current_good_id,
                              first_visit_timestamp, 
                              last_updated_timestamp,
-                             last_message_id_with_buttons
+                             last_message_id_with_buttons,
+                             name,
+                             last_name,
+                             telegram_login
                              ) 
-                            VALUES (?,?,?,?,?,?,?,?,?)
+                            VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
                              RETURNING *""", (
             self.telegram_id,
             self.state,
@@ -136,6 +158,9 @@ class User:
             self.first_visit_timestamp,
             self.last_updated_timestamp,
             self.last_message_id_with_buttons,
+            self.name,
+            self.last_name,
+            self.telegram_login
         ))
         self.user_id = cursor.fetchone()['user_id']  # заполняем ID пользователя из новосозданной строки
 
@@ -202,6 +227,14 @@ class User:
                     if telegram_id > 0:
                         self.telegram_id = telegram_id
                     self.create_user_in_db(cursor)
+
+    def set_last_message_id_with_buttons(self, message_id):
+        """
+        Установка значения последнего сообщения с пользователем (обычный сеттер)
+        :param message_id: ID сообщения
+        :return:  None
+        """
+        self.last_message_id_with_buttons = message_id
 
     def set_state(self, value) -> None:
         """
