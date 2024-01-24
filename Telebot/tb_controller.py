@@ -87,7 +87,7 @@ class TelegramBot:
             :return: None
             """
             if not this_user:
-                this_user = User(telegram_id=message.from_user.id)
+                this_user = User(telegram_id=message.from_user.id, telegram_login=message.from_user.username, name=message.from_user.first_name, last_name=message.from_user.last_name)
             keyboard = get_keyboard_by_categories_list(CategoriesPool.get_main_categories(), "cat", 0)  # через бд
             if replace:
                 self.bot.edit_message_reply_markup(
@@ -103,13 +103,14 @@ class TelegramBot:
             this_user.update_user_in_db()
 
         @self.bot.message_handler(commands=['start'])
-        def get_started(message) -> None:
+        def get_started(message: types.Message) -> None:
             """
             Сообщение пользователю при ввобде команды /start
             :param message: сообщение
             :return: None
             """
-            this_user = User(telegram_id=message.from_user.id)
+            print(message)
+            this_user = User(telegram_id=message.from_user.id, telegram_login=message.from_user.username, name=message.from_user.first_name, last_name=message.from_user.last_name)
             if not this_user.last_message_id_with_buttons:
                 self.bot.send_message(message.from_user.id, "Привет, угадаешь ценник вещи?")
             if this_user.state == UserStates.CHOOSE_CAT:
